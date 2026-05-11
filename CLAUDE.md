@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Workflow
+
+This repo is hosted on a public GitHub org. Never commit directly to `main`.
+
+**Branch naming:**
+- `feature/short-description` — new user-facing functionality
+- `dev/short-description` — work-in-progress, experiments, or non-feature changes
+
+Always create a PR to merge into `main`. Keep commits deliberate and scoped — one logical change per PR.
+
 ## Commands
 
 ```bash
