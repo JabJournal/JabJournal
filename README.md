@@ -1,4 +1,4 @@
-# Peptide Tracker
+# JabJournal
 
 An offline-first app for tracking peptide doses, injection calculations, and schedules. Currently available on Android, with iOS support coming soon.
 
