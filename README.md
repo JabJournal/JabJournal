@@ -1,15 +1,44 @@
-# JabJournal
+<p align="center">
+  <img src="assets/icons/icon_master.png" width="110" alt="JabJournal">
+</p>
 
-An offline-first app for tracking peptide doses, injection calculations, and schedules. Currently available on Android, with iOS support coming soon.
+<h1 align="center">JabJournal</h1>
 
-> [!IMPORTANT]  
+<p align="center">
+  An offline-first app for tracking peptide doses, injection calculations, and schedules.<br>
+  Currently available on Android, with iOS support coming soon.
+</p>
+
+<p align="center">
+  <a href="https://github.com/JabJournal/JabJournal/releases/latest">
+    <img src="https://img.shields.io/github/v/release/JabJournal/JabJournal?label=Download%20APK&logo=android&logoColor=white&color=3DDC84" alt="Latest Release">
+  </a>
+</p>
+
+> [!IMPORTANT]
 > This app was created with the help of Claude Code. If you do not like that, please refrain from using the app.
 
-> [!WARNING]  
-> Please note that the app is not intended for clinical use, and any medical advice should be obtained from a qualified healthcare provider.
+> [!WARNING]
+> This app is not intended for clinical use. Always consult a qualified healthcare provider for medical advice.
+
+## Screenshots
+
+<table align="center">
+  <tr>
+    <td><img src="assets/screenshots/image1.jpeg" width="190"/></td>
+    <td><img src="assets/screenshots/image2.jpeg" width="190"/></td>
+    <td><img src="assets/screenshots/image3.jpeg" width="190"/></td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/image4.jpeg" width="190"/></td>
+    <td><img src="assets/screenshots/image5.jpeg" width="190"/></td>
+    <td><img src="assets/screenshots/image6.jpeg" width="190"/></td>
+  </tr>
+</table>
 
 ## Features
 
+- **Free. Forever.** — no ads, no subscription fees. Core features of the app will always remain free and open-source.
 - **Peptide Management** — add, edit, and delete peptides with vendor and dosage info
 - **Dose Logging** — record doses with injection site, side effects, and ISR severity
 - **Injection Calculator** — compute draw amounts from vial/syringe specs and desired dose
@@ -17,7 +46,8 @@ An offline-first app for tracking peptide doses, injection calculations, and sch
 - **Weight Tracking** — log weight entries, optionally linked to a dose
 - **Dashboard** — summary stats and charts across all tracked data
 - **Offline-First** — all data stored locally in SQLite; works with no internet connection
-- **Cloud Sync** — optional Supabase integration for backup and multi-device access
+- **Automatic Data Backups** — your data is just that. Yours. Automatically backup your data and restore it from a backup if needed.
+- **Cloud Sync** — optional Supabase integration for backup and multi-device access (currently untested)
 - **Local Notifications** — timezone-aware dose reminders with a foreground service on Android
 
 ## Getting Started
@@ -53,7 +83,7 @@ flutter build apk        # Build Android APK
 flutter clean            # Clear build artifacts
 ```
 
-## Cloud Sync Setup (Optional)
+## Cloud Sync Setup (Optional. Currently untested.)
 
 By default the app runs fully offline. To enable Supabase sync, update `lib/config/app_config.dart`:
 
@@ -105,11 +135,6 @@ lib/
 └── utils/
 ```
 
-## Troubleshooting
+## Contributing
 
-| Problem                             | Fix                                                                                                                         |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Supabase not syncing                | Verify URL and anon key in `app_config.dart`; check `flutter logs`                                                          |
-| Database corruption                 | Delete and reinstall to reset SQLite; see `sqlite_service.dart` for schema                                                  |
-| Build failures                      | `flutter clean && flutter pub get`                                                                                          |
-| Notifications not firing on Android | Ensure battery optimization is disabled for the app; the foreground service handles this automatically on supported devices |
+PRs are welcome! If you have a bug fix, feature idea, or improvement, feel free to open an issue to discuss it or submit a pull request directly. Please keep changes focused — one logical change per PR.
