@@ -1,6 +1,5 @@
 import 'dart:io' show Platform;
 
-import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -52,21 +51,6 @@ class NotificationService {
           android: androidSettings, iOS: iOSSettings),
       onDidReceiveNotificationResponse: NotificationRouter.handleResponse,
     );
-
-    // If the app was launched from a tapped notification (cold start), the
-    // initialize callback above isn't fired — we have to fetch the launch
-    // details and route manually.
-    final launchDetails =
-        await _localNotifications.getNotificationAppLaunchDetails();
-    if (launchDetails?.didNotificationLaunchApp == true) {
-      final response = launchDetails?.notificationResponse;
-      if (response != null) {
-        // Defer until after the first frame so the navigator is mounted.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          NotificationRouter.handleResponse(response);
-        });
-      }
-    }
 
     _initialized = true;
   }

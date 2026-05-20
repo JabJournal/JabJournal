@@ -66,20 +66,26 @@ class NotificationRouter {
     _openLogDose(peptideId: peptideId, peptideName: peptideName);
   }
 
+  static bool _logDoseOpen = false;
+
   static void _openLogDose({
     required String peptideId,
     required String peptideName,
   }) {
+    if (_logDoseOpen) return;
     final navigator = navigatorKey.currentState;
     if (navigator == null) return;
 
-    navigator.push(
-      MaterialPageRoute(
-        builder: (_) => LogDoseScreen(
-          peptideId: peptideId,
-          peptideName: peptideName,
-        ),
-      ),
-    );
+    _logDoseOpen = true;
+    navigator
+        .push(
+          MaterialPageRoute(
+            builder: (_) => LogDoseScreen(
+              peptideId: peptideId,
+              peptideName: peptideName,
+            ),
+          ),
+        )
+        .whenComplete(() => _logDoseOpen = false);
   }
 }
