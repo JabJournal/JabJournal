@@ -129,6 +129,25 @@ class NotificationService {
     await android?.requestExactAlarmsPermission();
   }
 
+  // ── Launch routing ──────────────────────────────────────────────────────────
+
+  /// Checks whether the app was cold-started via a notification tap and, if so,
+  /// forwards the response to [NotificationRouter.handleResponse].
+  ///
+  /// Call this from HomeScreen.initState (addPostFrameCallback) after the
+  /// widget tree is live. It is a no-op if [NotificationRouter.flushPending]
+  /// already has a pending navigation stored (meaning the plugin already called
+  /// [onDidReceiveNotificationResponse] during [initialize]).
+  Future<void> checkLaunchDetails() async {
+    if (!_initialized) await initialize();
+    final details = await _localNotifications.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp != true) return;
+    final response = details!.notificationResponse;
+    if (response != null) {
+      NotificationRouter.handleResponse(response);
+    }
+  }
+
   // ── One-shot notifications ──────────────────────────────────────────────────
 
   Future<void> showNotification({

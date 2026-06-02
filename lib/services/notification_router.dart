@@ -63,7 +63,26 @@ class NotificationRouter {
     final peptideName = data['peptideName'] as String?;
     if (peptideId == null || peptideName == null) return;
 
+    if (navigatorKey.currentState == null) {
+      // Widget tree not mounted yet (cold-start). Store for flushPending().
+      _pending = _PendingNav(peptideId: peptideId, peptideName: peptideName);
+      return;
+    }
+
     _openLogDose(peptideId: peptideId, peptideName: peptideName);
+  }
+
+  // Holds navigation intent that arrived before the widget tree was mounted
+  // (cold-start race condition on aggressive OEM task-killers like Samsung One UI).
+  static _PendingNav? _pending;
+
+  /// Call from HomeScreen.initState (addPostFrameCallback) to process any
+  /// navigation that arrived before the widget tree was ready.
+  static void flushPending() {
+    final p = _pending;
+    _pending = null;
+    if (p == null) return;
+    _openLogDose(peptideId: p.peptideId, peptideName: p.peptideName);
   }
 
   static bool _logDoseOpen = false;
@@ -88,4 +107,10 @@ class NotificationRouter {
         )
         .whenComplete(() => _logDoseOpen = false);
   }
+}
+
+class _PendingNav {
+  final String peptideId;
+  final String peptideName;
+  const _PendingNav({required this.peptideId, required this.peptideName});
 }

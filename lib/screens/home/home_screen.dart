@@ -16,6 +16,8 @@ import '../schedules/schedule_screen.dart';
 import '../schedules/add_edit_schedule_screen.dart';
 import '../weight/log_weight_screen.dart';
 import '../weight/weight_history_screen.dart';
+import '../../services/notification_router.dart';
+import '../../services/notification_service.dart';
 import '../calculator/calculator_tab.dart';
 import 'dashboard_tab.dart';
 
@@ -59,6 +61,10 @@ class _HomeScreenState extends State<HomeScreen>
       context.read<CalculatorProvider>().loadCalculations();
       context.read<ScheduleProvider>().loadAllSchedules();
       context.read<WeightProvider>().loadAll();
+      // Flush any notification tap that arrived before the widget tree was
+      // ready (cold-start on aggressive OEM task-killers like Samsung One UI).
+      NotificationRouter.flushPending();
+      NotificationService().checkLaunchDetails();
     });
   }
 
