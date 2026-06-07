@@ -50,6 +50,10 @@ class SQLiteService {
     if (oldVersion < 5) {
       await _migrateToV5(db);
     }
+    // v5 → v6: completed_occurrences on schedules (early dose logging)
+    if (oldVersion < 6) {
+      await _migrateToV6(db);
+    }
     // Always make sure the latest schema exists (idempotent CREATE IF NOT EXISTS).
     await _createTables(db);
   }
@@ -105,6 +109,14 @@ class SQLiteService {
     }
   }
 
+  Future<void> _migrateToV6(Database db) async {
+    final cols = await db.rawQuery('PRAGMA table_info(peptide_schedules)');
+    if (!cols.any((c) => c['name'] == 'completed_occurrences')) {
+      await db.execute(
+          'ALTER TABLE peptide_schedules ADD COLUMN completed_occurrences TEXT');
+    }
+  }
+
   Future<void> _createTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS peptides (
@@ -149,6 +161,7 @@ class SQLiteService {
         enabled INTEGER DEFAULT 1,
         specific_date INTEGER,
         end_date INTEGER,
+        completed_occurrences TEXT,
         sync_status TEXT DEFAULT 'pending',
         remote_id TEXT,
         FOREIGN KEY (peptide_id) REFERENCES peptides (id)

@@ -6,6 +6,7 @@ import '../../providers/peptide_provider.dart';
 import '../../providers/schedule_provider.dart';
 import 'add_edit_schedule_screen.dart';
 import 'notification_status_banner.dart';
+import '../doses/log_dose_screen.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -136,6 +137,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           itemBuilder: (context, i) => _ScheduleCard(
                             schedule: selectedEvents[i],
                             scheduleProvider: scheduleProvider,
+                            selectedDay: DateTime(
+                              _selectedDay.year,
+                              _selectedDay.month,
+                              _selectedDay.day,
+                            ),
                           ),
                         ),
                 ),
@@ -153,9 +159,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 class _ScheduleCard extends StatelessWidget {
   final PeptideSchedule schedule;
   final ScheduleProvider scheduleProvider;
+  final DateTime selectedDay;
 
-  const _ScheduleCard(
-      {required this.schedule, required this.scheduleProvider});
+  const _ScheduleCard({
+    required this.schedule,
+    required this.scheduleProvider,
+    required this.selectedDay,
+  });
 
   String _formatTime(int secondsFromMidnight) {
     final hour = secondsFromMidnight ~/ 3600;
@@ -199,7 +209,9 @@ class _ScheduleCard extends StatelessWidget {
       }
     }
     tags.add(time);
-    if (schedule.isExpired()) {
+    if (schedule.isOccurrenceCompleted(selectedDay)) {
+      tags.add('Logged');
+    } else if (schedule.isExpired()) {
       tags.add('Expired');
     } else if (!schedule.enabled) {
       tags.add('Paused');
@@ -214,97 +226,128 @@ class _ScheduleCard extends StatelessWidget {
 
     final isOff = !schedule.enabled;
     final isExpired = schedule.isExpired();
-    final dimmed = isOff || isExpired;
+    final isLogged = schedule.isOccurrenceCompleted(selectedDay);
+    final dimmed = isOff || isExpired || isLogged;
+
+    IconData leadingIcon;
+    if (isLogged) {
+      leadingIcon = Icons.check_circle_outline;
+    } else if (isExpired) {
+      leadingIcon = Icons.event_busy_outlined;
+    } else if (isOff) {
+      leadingIcon = Icons.notifications_off_outlined;
+    } else if (schedule.frequency == ScheduleFrequency.once) {
+      leadingIcon = Icons.event_outlined;
+    } else {
+      leadingIcon = Icons.science;
+    }
+
+    final canLogEarly = schedule.enabled && !isExpired && !isLogged;
+
     return Opacity(
       opacity: dimmed ? 0.55 : 1.0,
       child: Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.15),
-          child: Icon(
-            isExpired
-                ? Icons.event_busy_outlined
-                : (isOff
-                    ? Icons.notifications_off_outlined
-                    : (schedule.frequency == ScheduleFrequency.once
-                        ? Icons.event_outlined
-                        : Icons.science)),
-            color: color,
+          leading: CircleAvatar(
+            backgroundColor: color.withValues(alpha: 0.15),
+            child: Icon(leadingIcon, color: color),
+          ),
+          title: Text(name),
+          subtitle: Text(_buildSubtitle()),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Switch(
+                value: schedule.enabled,
+                onChanged: (_) => scheduleProvider.toggleEnabled(schedule.id),
+              ),
+              PopupMenuButton(
+                icon: const Icon(Icons.more_vert),
+                itemBuilder: (_) => [
+                  if (canLogEarly)
+                    const PopupMenuItem(
+                      value: 'log_early',
+                      child: ListTile(
+                        leading: Icon(Icons.add_circle_outline),
+                        title: Text('Log Dose Early'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: ListTile(
+                      leading: Icon(Icons.edit_outlined),
+                      title: Text('Edit'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_outline),
+                      title: Text('Delete'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+                onSelected: (value) async {
+                  if (value == 'log_early') {
+                    final doseId = await Navigator.push<String?>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LogDoseScreen(
+                          peptideId: schedule.peptideId,
+                          peptideName: name,
+                        ),
+                      ),
+                    );
+                    if (doseId != null && context.mounted) {
+                      await scheduleProvider.markOccurrenceComplete(
+                          schedule.id, selectedDay);
+                    }
+                  } else if (value == 'edit') {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AddEditScheduleScreen(schedule: schedule),
+                      ),
+                    );
+                    if (context.mounted) {
+                      await scheduleProvider.loadAllSchedules();
+                    }
+                  } else if (value == 'delete') {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Delete Schedule?'),
+                        content: Text(
+                            'The "$name" schedule will be permanently deleted.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: TextButton.styleFrom(
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.error),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true && context.mounted) {
+                      await scheduleProvider.deleteSchedule(schedule.id);
+                    }
+                  }
+                },
+              ),
+            ],
           ),
         ),
-        title: Text(name),
-        subtitle: Text(_buildSubtitle()),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Switch(
-              value: schedule.enabled,
-              onChanged: (_) => scheduleProvider.toggleEnabled(schedule.id),
-            ),
-            PopupMenuButton(
-              icon: const Icon(Icons.more_vert),
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit_outlined),
-                    title: Text('Edit'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(Icons.delete_outline),
-                    title: Text('Delete'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
-              onSelected: (value) async {
-                if (value == 'edit') {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          AddEditScheduleScreen(schedule: schedule),
-                    ),
-                  );
-                  if (context.mounted) {
-                    await scheduleProvider.loadAllSchedules();
-                  }
-                } else if (value == 'delete') {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text('Delete Schedule?'),
-                      content: Text(
-                          'The "$name" schedule will be permanently deleted.'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: TextButton.styleFrom(
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.error),
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirmed == true && context.mounted) {
-                    await scheduleProvider.deleteSchedule(schedule.id);
-                  }
-                }
-              },
-            ),
-          ],
-        ),
-      ),
       ),
     );
   }

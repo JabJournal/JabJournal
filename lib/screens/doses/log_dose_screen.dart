@@ -204,7 +204,7 @@ class _LogDoseScreenState extends State<LogDoseScreen> {
     }
 
     if (!mounted) return;
-    Navigator.pop(context);
+    Navigator.pop(context, doseId);
   }
 
   void _snack(String msg) {

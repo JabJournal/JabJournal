@@ -220,6 +220,7 @@ class NotificationService {
     required int dayOfWeek,
     required int secondsFromMidnight,
     String? payload,
+    bool skipCurrentOccurrence = false,
   }) async {
     if (!_initialized) await initialize();
 
@@ -233,7 +234,7 @@ class NotificationService {
     while (scheduledDate.weekday != dayOfWeek) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
-    if (scheduledDate.isBefore(now)) {
+    if (skipCurrentOccurrence || scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 7));
     }
 
