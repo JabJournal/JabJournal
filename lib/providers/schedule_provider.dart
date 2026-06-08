@@ -199,6 +199,11 @@ class ScheduleProvider with ChangeNotifier {
     if (s.frequency == ScheduleFrequency.once) {
       final sd = s.specificDate;
       if (sd == null) return;
+      // If this one-shot was already logged early, cancel and skip.
+      if (s.isOccurrenceCompleted(sd)) {
+        await _notifications.cancelNotification(_notificationIdForOnce(s.id));
+        return;
+      }
       final fireAt = DateTime(
         sd.year,
         sd.month,
@@ -219,7 +224,13 @@ class ScheduleProvider with ChangeNotifier {
 
     // Weekly (with or without end date — end date is enforced lazily on
     // app launch via loadAllSchedules cancelling expired ones).
+    final today = DateTime.now();
+    final todayKey = DateTime(today.year, today.month, today.day);
     for (final day in s.daysOfWeek) {
+      // If today's occurrence for this day was already logged early, skip it
+      // so the notification fires next week instead.
+      final skipToday =
+          s.isOccurrenceCompleted(todayKey) && todayKey.weekday == day;
       await _notifications.scheduleWeeklyNotification(
         id: notificationIdForDay(s.id, day),
         title: 'Time for $peptideName',
@@ -227,7 +238,62 @@ class ScheduleProvider with ChangeNotifier {
         dayOfWeek: day,
         secondsFromMidnight: s.timeOfDay,
         payload: payload,
+        skipCurrentOccurrence: skipToday,
       );
+    }
+  }
+
+  /// Records that the user logged a dose for [scheduleId] on [occurrenceDate]
+  /// and suppresses the notification for that occurrence.
+  Future<void> markOccurrenceComplete(
+      String scheduleId, DateTime occurrenceDate) async {
+    final idx = _schedules.indexWhere((s) => s.id == scheduleId);
+    if (idx == -1) return;
+    final schedule = _schedules[idx];
+
+    if (schedule.isOccurrenceCompleted(occurrenceDate)) return;
+
+    final dateStr =
+        '${occurrenceDate.year}-${occurrenceDate.month.toString().padLeft(2, '0')}-${occurrenceDate.day.toString().padLeft(2, '0')}';
+    final updated = schedule.copyWith(
+      completedOccurrences: [...schedule.completedOccurrences, dateStr],
+    );
+
+    try {
+      await _db.updateSchedule(updated);
+      _schedules[idx] = updated;
+      notifyListeners();
+
+      final peptideName = peptideNameForSchedule(updated);
+      if (schedule.frequency == ScheduleFrequency.once) {
+        await _notifications.cancelNotification(
+            _notificationIdForOnce(schedule.id));
+      } else {
+        final day = occurrenceDate.weekday;
+        if (schedule.daysOfWeek.contains(day)) {
+          final payload = NotificationRouter.buildSchedulePayload(
+            scheduleId: schedule.id,
+            peptideId: schedule.peptideId,
+            peptideName: peptideName,
+            dayOfWeek: day,
+          );
+          await _notifications.cancelNotification(
+              notificationIdForDay(schedule.id, day));
+          await _notifications.scheduleWeeklyNotification(
+            id: notificationIdForDay(schedule.id, day),
+            title: 'Time for $peptideName',
+            body: 'Your scheduled dose is due.',
+            dayOfWeek: day,
+            secondsFromMidnight: schedule.timeOfDay,
+            payload: payload,
+            skipCurrentOccurrence: true,
+          );
+        }
+      }
+      BackupScheduler.instance.scheduleBackup();
+    } catch (e) {
+      _error = 'Error marking occurrence complete: $e';
+      notifyListeners();
     }
   }
 

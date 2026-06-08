@@ -45,6 +45,10 @@ class PeptideSchedule {
   /// schedule no longer fires (we cancel its notifications on app launch).
   final DateTime? endDate;
 
+  /// ISO date strings (YYYY-MM-DD) for occurrences the user already logged
+  /// early so notifications for those days are suppressed.
+  final List<String> completedOccurrences;
+
   final String syncStatus;
   final String? remoteId;
 
@@ -57,6 +61,7 @@ class PeptideSchedule {
     this.enabled = true,
     this.specificDate,
     this.endDate,
+    this.completedOccurrences = const [],
     this.syncStatus = 'pending',
     this.remoteId,
   });
@@ -70,6 +75,7 @@ class PeptideSchedule {
     bool? enabled,
     DateTime? specificDate,
     DateTime? endDate,
+    List<String>? completedOccurrences,
     String? syncStatus,
     String? remoteId,
     bool clearSpecificDate = false,
@@ -86,10 +92,18 @@ class PeptideSchedule {
           ? null
           : (specificDate ?? this.specificDate),
       endDate: clearEndDate ? null : (endDate ?? this.endDate),
+      completedOccurrences: completedOccurrences ?? this.completedOccurrences,
       syncStatus: syncStatus ?? this.syncStatus,
       remoteId: remoteId ?? this.remoteId,
     );
   }
+
+  static String _dateKey(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  /// Returns true if the occurrence on [date] was already logged early.
+  bool isOccurrenceCompleted(DateTime date) =>
+      completedOccurrences.contains(_dateKey(date));
 
   /// True if this is a one-shot reminder whose date has passed, or a weekly
   /// reminder whose [endDate] has passed.
@@ -117,6 +131,7 @@ class PeptideSchedule {
       'enabled': enabled ? 1 : 0,
       'specific_date': specificDate?.millisecondsSinceEpoch,
       'end_date': endDate?.millisecondsSinceEpoch,
+      'completed_occurrences': jsonEncode(completedOccurrences),
       'sync_status': syncStatus,
       'remote_id': remoteId,
     };
@@ -136,6 +151,8 @@ class PeptideSchedule {
       endDate: map['end_date'] == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(map['end_date'] as int),
+      completedOccurrences: List<String>.from(
+          jsonDecode(map['completed_occurrences'] ?? '[]')),
       syncStatus: map['sync_status'] ?? 'pending',
       remoteId: map['remote_id'],
     );
