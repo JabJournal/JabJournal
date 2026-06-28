@@ -63,6 +63,40 @@ class ScheduleProvider with ChangeNotifier {
         await _scheduleNotifications(s, nameById[s.peptideId] ?? 'Unknown');
       }
     }
+
+    // Re-register any pending rescheduled one-shots. We re-register the entry
+    // with the latest future newDateTime per schedule — older ones are stale
+    // (their notification slots are gone) and we leave them in the DB as
+    // history so the calendar can still show "Rescheduled to …" for past days.
+    for (final s in _schedules) {
+      if (s.isExpired() || !s.enabled) continue;
+      final pending = _latestPendingReschedule(s);
+      if (pending == null) {
+        // No active reschedule — make sure the slot is clear.
+        await _notifications
+            .cancelNotification(notificationIdForReschedule(s.id));
+      } else {
+        await _scheduleRescheduleOneShot(
+          s,
+          pending,
+          nameById[s.peptideId] ?? 'Unknown',
+        );
+      }
+    }
+  }
+
+  /// Returns the reschedule entry for [schedule] whose [RescheduledOccurrence.newDateTime]
+  /// is still in the future and is the most recent. Returns null if none.
+  RescheduledOccurrence? _latestPendingReschedule(PeptideSchedule schedule) {
+    final now = DateTime.now();
+    RescheduledOccurrence? latest;
+    for (final r in schedule.rescheduledOccurrences) {
+      if (!r.newDateTime.isAfter(now)) continue;
+      if (latest == null || r.newDateTime.isAfter(latest.newDateTime)) {
+        latest = r;
+      }
+    }
+    return latest;
   }
 
   // ── Queries ─────────────────────────────────────────────────────────────────
@@ -77,6 +111,13 @@ class ScheduleProvider with ChangeNotifier {
   /// hiding them entirely, so the user understands "off" means paused, not
   /// deleted. One-shot schedules show only on their specific date. Weekly
   /// schedules with an end date stop showing past that date.
+  ///
+  /// Rescheduled occurrences appear on the new day in addition to the original
+  /// day. If the user picked the "replace" option, the new day shows ONLY the
+  /// rescheduled dose (the normal occurrence is suppressed). If they picked
+  /// "keep both", both the normal and rescheduled entries appear on the new
+  /// day. The original day always shows the schedule with a "Rescheduled to…"
+  /// tag so the user can see where the dose was moved.
   Map<DateTime, List<PeptideSchedule>> buildEventMap() {
     final result = <DateTime, List<PeptideSchedule>>{};
     final today = DateTime.now();
@@ -104,7 +145,24 @@ class ScheduleProvider with ChangeNotifier {
             if (dayKey.isAfter(ed)) continue;
           }
         }
+        // Skip the normal occurrence if it has been replaced by a reschedule
+        // that landed on this same day (and the user picked "replace").
+        if (s.isOccurrenceReplaced(dayKey)) continue;
         (result[dayKey] ??= []).add(s);
+      }
+    }
+
+    // Add rescheduled doses to their new day if the schedule isn't already
+    // showing there as a normal occurrence (avoids double-listing). The card
+    // uses [PeptideSchedule.rescheduleToDate] to render the "Rescheduled
+    // from …" tag.
+    for (final s in _schedules) {
+      for (final r in s.rescheduledOccurrences) {
+        final newDay = DateTime(
+            r.newDateTime.year, r.newDateTime.month, r.newDateTime.day);
+        if (newDay.isBefore(start) || !newDay.isBefore(end)) continue;
+        final list = result[newDay] ??= [];
+        if (!list.contains(s)) list.add(s);
       }
     }
     return result;
@@ -185,6 +243,13 @@ class ScheduleProvider with ChangeNotifier {
   int _notificationIdForOnce(String scheduleId) =>
       _notificationIdBase(scheduleId);
 
+  /// Slot 100 (well outside the 0..7 range used by once/weekly) holds the
+  /// one-shot reminder for a manually rescheduled occurrence. Only one
+  /// rescheduled reminder can be active per schedule at a time — re-rescheduling
+  /// the same dose simply overwrites the previous rescheduled alarm.
+  int notificationIdForReschedule(String scheduleId) =>
+      _notificationIdBase(scheduleId) + 100;
+
   Future<void> _scheduleNotifications(
       PeptideSchedule s, String peptideName) async {
     if (s.isExpired()) return;
@@ -255,8 +320,18 @@ class ScheduleProvider with ChangeNotifier {
 
     final dateStr =
         '${occurrenceDate.year}-${occurrenceDate.month.toString().padLeft(2, '0')}-${occurrenceDate.day.toString().padLeft(2, '0')}';
+    // Also clear any reschedule that touched this date (either as the original
+    // occurrence or as the rescheduled target) — logging the dose makes the
+    // pending rescheduled reminder moot.
+    final remainingReschedules = [...schedule.rescheduledOccurrences]
+      ..removeWhere((r) =>
+          '${r.originalDate.year}-${r.originalDate.month.toString().padLeft(2, '0')}-${r.originalDate.day.toString().padLeft(2, '0')}' ==
+              dateStr ||
+          '${r.newDateTime.year}-${r.newDateTime.month.toString().padLeft(2, '0')}-${r.newDateTime.day.toString().padLeft(2, '0')}' ==
+              dateStr);
     final updated = schedule.copyWith(
       completedOccurrences: [...schedule.completedOccurrences, dateStr],
+      rescheduledOccurrences: remainingReschedules,
     );
 
     try {
@@ -290,6 +365,10 @@ class ScheduleProvider with ChangeNotifier {
           );
         }
       }
+      // Clear the rescheduled one-shot — the dose is logged, the reminder
+      // should not fire.
+      await _notifications
+          .cancelNotification(notificationIdForReschedule(schedule.id));
       BackupScheduler.instance.scheduleBackup();
     } catch (e) {
       _error = 'Error marking occurrence complete: $e';
@@ -298,13 +377,97 @@ class ScheduleProvider with ChangeNotifier {
   }
 
   /// Brute-force cancel all notification IDs that could belong to this
-  /// schedule — slot 0 for the one-shot, slots 1-7 for weekly day-of-week.
+  /// schedule — slot 0 for the one-shot, slots 1-7 for weekly day-of-week,
+  /// slot 100 for any pending rescheduled one-shot.
   Future<void> _cancelNotificationsForSchedule(PeptideSchedule s) async {
     await _notifications.cancelNotification(_notificationIdForOnce(s.id));
     for (int day = 1; day <= 7; day++) {
       await _notifications
           .cancelNotification(notificationIdForDay(s.id, day));
     }
+    await _notifications
+        .cancelNotification(notificationIdForReschedule(s.id));
+  }
+
+  /// Re-schedules a single occurrence of [scheduleId] to fire at [newDateTime]
+  /// as a one-shot reminder, leaving the original (and any future) occurrences
+  /// untouched. Used by the "Re-schedule" action button on the notification
+  /// and the "Re-schedule Dose" screen.
+  ///
+  /// The reschedule is persisted on the schedule (so it survives app restarts
+  /// and shows up on the schedule page) and a one-shot alarm is registered in
+  /// slot 100. If [replacesExistingOnNewDay] is true, the normal occurrence
+  /// that would land on [newDateTime]'s date is suppressed (the rescheduled
+  /// dose replaces it). If false, both events are shown.
+  ///
+  /// Re-rescheduling the same occurrence (same [originalDate]) overwrites the
+  /// previous entry; rescheduling a different occurrence adds a new entry.
+  Future<void> rescheduleOccurrence({
+    required String scheduleId,
+    required DateTime originalDate,
+    required DateTime newDateTime,
+    bool replacesExistingOnNewDay = false,
+  }) async {
+    final idx = _schedules.indexWhere((s) => s.id == scheduleId);
+    if (idx == -1) return;
+    final schedule = _schedules[idx];
+    if (schedule.isExpired() || !schedule.enabled) return;
+    if (!newDateTime.isAfter(DateTime.now())) return;
+
+    final origDateOnly = DateTime(
+        originalDate.year, originalDate.month, originalDate.day);
+    final newEntry = RescheduledOccurrence(
+      originalDate: origDateOnly,
+      newDateTime: newDateTime,
+      replacesExistingOnNewDay: replacesExistingOnNewDay,
+    );
+
+    // Replace any prior entry for the same original date so re-rescheduling
+    // the same dose updates rather than stacks.
+    final updatedList = [
+      ...schedule.rescheduledOccurrences
+          .where((r) => r.originalDate != origDateOnly),
+      newEntry,
+    ];
+
+    final updated = schedule.copyWith(
+      rescheduledOccurrences: updatedList,
+      syncStatus: 'pending',
+    );
+
+    try {
+      await _db.updateSchedule(updated);
+      _schedules[idx] = updated;
+      notifyListeners();
+
+      final peptideName = peptideNameForSchedule(updated);
+      await _scheduleRescheduleOneShot(updated, newEntry, peptideName);
+      BackupScheduler.instance.scheduleBackup();
+    } catch (e) {
+      _error = 'Error rescheduling dose: $e';
+      notifyListeners();
+    }
+  }
+
+  /// Registers the one-shot alarm in the reschedule notification slot.
+  Future<void> _scheduleRescheduleOneShot(
+    PeptideSchedule schedule,
+    RescheduledOccurrence entry,
+    String peptideName,
+  ) async {
+    final payload = NotificationRouter.buildSchedulePayload(
+      scheduleId: schedule.id,
+      peptideId: schedule.peptideId,
+      peptideName: peptideName,
+      dayOfWeek: 0,
+    );
+    await _notifications.scheduleOnceReminder(
+      id: notificationIdForReschedule(schedule.id),
+      title: 'Time for $peptideName',
+      body: 'Your scheduled dose is due.',
+      scheduledTime: entry.newDateTime,
+      payload: payload,
+    );
   }
 
   // ── Color / name helpers (used by the calendar) ──────────────────────────────

@@ -6,6 +6,7 @@ import '../../providers/peptide_provider.dart';
 import '../../providers/schedule_provider.dart';
 import 'add_edit_schedule_screen.dart';
 import 'notification_status_banner.dart';
+import 'reschedule_dose_screen.dart';
 import '../doses/log_dose_screen.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -80,24 +81,31 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   calendarBuilders: CalendarBuilders(
                     markerBuilder: (context, day, events) {
                       if (events.isEmpty) return const SizedBox();
+                      final dayKey = DateTime(day.year, day.month, day.day);
                       return Positioned(
                         bottom: 2,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: events.take(4).map((s) {
                             final color = scheduleProvider.colorForSchedule(s);
+                            final isRescheduled =
+                                s.isOccurrenceRescheduled(dayKey) ||
+                                    s.rescheduleToDate(dayKey) != null;
                             return Container(
                               width: 6,
                               height: 6,
                               margin: const EdgeInsets.symmetric(horizontal: 1),
                               decoration: BoxDecoration(
-                                // Disabled schedules render as outlined dots
-                                // so the user sees they still exist but are
-                                // paused.
-                                color: s.enabled ? color : Colors.transparent,
-                                border: s.enabled
-                                    ? null
-                                    : Border.all(color: color, width: 1),
+                                // Rescheduled days get an outlined ring so
+                                // the user can spot moved doses at a glance.
+                                // Disabled schedules also render as outlined
+                                // dots (paused, not deleted).
+                                color: (s.enabled && !isRescheduled)
+                                    ? color
+                                    : Colors.transparent,
+                                border: (!s.enabled || isRescheduled)
+                                    ? Border.all(color: color, width: 1)
+                                    : null,
                                 shape: BoxShape.circle,
                               ),
                             );
@@ -219,14 +227,44 @@ class _ScheduleCard extends StatelessWidget {
     return tags.join(' · ');
   }
 
+  /// Second subtitle line for the card. Shown only when there's a reschedule
+  /// to call out (either the dose was moved away from this day, or moved to
+  /// this day). Keeps the main subtitle scannable when there's nothing
+  /// reschedule-related to show.
+  String? _buildRescheduleSubtitle() {
+    final target = schedule.rescheduleTarget(selectedDay);
+    if (target != null) {
+      // This day is the original — the dose was moved away.
+      return 'Rescheduled to ${_formatDateTime(target)}';
+    }
+    final original = schedule.rescheduleOriginal(selectedDay);
+    if (original != null) {
+      // This day is the rescheduled target — a dose was moved here.
+      return 'Rescheduled from ${_formatDate(original)}';
+    }
+    return null;
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final date = _formatDate(dt);
+    final tod = TimeOfDay(hour: dt.hour, minute: dt.minute);
+    final h = tod.hourOfPeriod == 0 ? 12 : tod.hourOfPeriod;
+    final m = tod.minute.toString().padLeft(2, '0');
+    final period = tod.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$date · $h:$m $period';
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = scheduleProvider.colorForSchedule(schedule);
     final name = scheduleProvider.peptideNameForSchedule(schedule);
+    final theme = Theme.of(context);
 
     final isOff = !schedule.enabled;
     final isExpired = schedule.isExpired();
     final isLogged = schedule.isOccurrenceCompleted(selectedDay);
+    final isRescheduledAway = schedule.isOccurrenceRescheduled(selectedDay);
+    final isRescheduledToHere = schedule.rescheduleToDate(selectedDay) != null;
     final dimmed = isOff || isExpired || isLogged;
 
     IconData leadingIcon;
@@ -236,6 +274,10 @@ class _ScheduleCard extends StatelessWidget {
       leadingIcon = Icons.event_busy_outlined;
     } else if (isOff) {
       leadingIcon = Icons.notifications_off_outlined;
+    } else if (isRescheduledAway) {
+      leadingIcon = Icons.compare_arrows;
+    } else if (isRescheduledToHere) {
+      leadingIcon = Icons.move_to_inbox_outlined;
     } else if (schedule.frequency == ScheduleFrequency.once) {
       leadingIcon = Icons.event_outlined;
     } else {
@@ -243,6 +285,8 @@ class _ScheduleCard extends StatelessWidget {
     }
 
     final canLogEarly = schedule.enabled && !isExpired && !isLogged;
+    final rescheduleLine = _buildRescheduleSubtitle();
+    final rescheduledEntry = schedule.rescheduleForOriginalDate(selectedDay);
 
     return Opacity(
       opacity: dimmed ? 0.55 : 1.0,
@@ -254,7 +298,36 @@ class _ScheduleCard extends StatelessWidget {
             child: Icon(leadingIcon, color: color),
           ),
           title: Text(name),
-          subtitle: Text(_buildSubtitle()),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_buildSubtitle()),
+              if (rescheduleLine != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  rescheduleLine,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.tertiary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+              if (isRescheduledAway && rescheduledEntry != null) ...[
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: () => _openReschedule(context, schedule, name),
+                  icon: const Icon(Icons.edit_calendar_outlined, size: 18),
+                  label: const Text('Change new time'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          isThreeLine: rescheduleLine != null,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -271,6 +344,15 @@ class _ScheduleCard extends StatelessWidget {
                       child: ListTile(
                         leading: Icon(Icons.add_circle_outline),
                         title: Text('Log Dose Early'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  if (isRescheduledAway)
+                    const PopupMenuItem(
+                      value: 'reschedule',
+                      child: ListTile(
+                        leading: Icon(Icons.edit_calendar_outlined),
+                        title: Text('Re-schedule dose'),
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
@@ -306,6 +388,8 @@ class _ScheduleCard extends StatelessWidget {
                       await scheduleProvider.markOccurrenceComplete(
                           schedule.id, selectedDay);
                     }
+                  } else if (value == 'reschedule') {
+                    await _openReschedule(context, schedule, name);
                   } else if (value == 'edit') {
                     await Navigator.push(
                       context,
@@ -347,6 +431,25 @@ class _ScheduleCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openReschedule(
+    BuildContext context,
+    PeptideSchedule schedule,
+    String name,
+  ) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RescheduleDoseScreen(
+          scheduleId: schedule.id,
+          peptideId: schedule.peptideId,
+          peptideName: name,
+          dayOfWeek: selectedDay.weekday,
+          originalDate: selectedDay,
         ),
       ),
     );

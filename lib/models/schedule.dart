@@ -29,6 +29,58 @@ enum ScheduleFrequency {
   }
 }
 
+/// A single occurrence of a [PeptideSchedule] that was moved via the
+/// "Re-schedule" action on a notification.
+class RescheduledOccurrence {
+  /// The original calendar date the dose was due (date-only, time = 00:00).
+  final DateTime originalDate;
+
+  /// The new fire time the user picked.
+  final DateTime newDateTime;
+
+  /// If true, any normal schedule occurrence that lands on [newDateTime]'s
+  /// date is suppressed (the rescheduled dose replaces it). If false, the
+  /// rescheduled dose is shown alongside any normal occurrence on the new day.
+  final bool replacesExistingOnNewDay;
+
+  const RescheduledOccurrence({
+    required this.originalDate,
+    required this.newDateTime,
+    this.replacesExistingOnNewDay = false,
+  });
+
+  RescheduledOccurrence copyWith({
+    DateTime? originalDate,
+    DateTime? newDateTime,
+    bool? replacesExistingOnNewDay,
+  }) {
+    return RescheduledOccurrence(
+      originalDate: originalDate ?? this.originalDate,
+      newDateTime: newDateTime ?? this.newDateTime,
+      replacesExistingOnNewDay:
+          replacesExistingOnNewDay ?? this.replacesExistingOnNewDay,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'original_date': originalDate.millisecondsSinceEpoch,
+        'new_date_time': newDateTime.millisecondsSinceEpoch,
+        'replaces_existing_on_new_day':
+            replacesExistingOnNewDay ? 1 : 0,
+      };
+
+  factory RescheduledOccurrence.fromMap(Map<String, dynamic> map) {
+    return RescheduledOccurrence(
+      originalDate:
+          DateTime.fromMillisecondsSinceEpoch(map['original_date'] as int),
+      newDateTime:
+          DateTime.fromMillisecondsSinceEpoch(map['new_date_time'] as int),
+      replacesExistingOnNewDay:
+          (map['replaces_existing_on_new_day'] ?? 0) == 1,
+    );
+  }
+}
+
 class PeptideSchedule {
   final String id;
   final String peptideId;
@@ -49,6 +101,12 @@ class PeptideSchedule {
   /// early so notifications for those days are suppressed.
   final List<String> completedOccurrences;
 
+  /// Persisted record of doses the user moved via the "Re-schedule" action.
+  /// Each entry moves one occurrence from [RescheduledOccurrence.originalDate]
+  /// to [RescheduledOccurrence.newDateTime] without modifying the underlying
+  /// schedule — future occurrences are unaffected.
+  final List<RescheduledOccurrence> rescheduledOccurrences;
+
   final String syncStatus;
   final String? remoteId;
 
@@ -62,6 +120,7 @@ class PeptideSchedule {
     this.specificDate,
     this.endDate,
     this.completedOccurrences = const [],
+    this.rescheduledOccurrences = const [],
     this.syncStatus = 'pending',
     this.remoteId,
   });
@@ -76,6 +135,7 @@ class PeptideSchedule {
     DateTime? specificDate,
     DateTime? endDate,
     List<String>? completedOccurrences,
+    List<RescheduledOccurrence>? rescheduledOccurrences,
     String? syncStatus,
     String? remoteId,
     bool clearSpecificDate = false,
@@ -93,6 +153,8 @@ class PeptideSchedule {
           : (specificDate ?? this.specificDate),
       endDate: clearEndDate ? null : (endDate ?? this.endDate),
       completedOccurrences: completedOccurrences ?? this.completedOccurrences,
+      rescheduledOccurrences:
+          rescheduledOccurrences ?? this.rescheduledOccurrences,
       syncStatus: syncStatus ?? this.syncStatus,
       remoteId: remoteId ?? this.remoteId,
     );
@@ -121,6 +183,57 @@ class PeptideSchedule {
     return e.isBefore(today);
   }
 
+  // ── Reschedule helpers ────────────────────────────────────────────────────
+
+  /// Returns the reschedule entry whose original occurrence was on [date],
+  /// or null if [date] has not been rescheduled.
+  RescheduledOccurrence? rescheduleForOriginalDate(DateTime date) {
+    final key = _dateKey(date);
+    for (final r in rescheduledOccurrences) {
+      if (_dateKey(r.originalDate) == key) return r;
+    }
+    return null;
+  }
+
+  /// Returns the reschedule entry that lands on [date], or null if none.
+  RescheduledOccurrence? rescheduleToDate(DateTime date) {
+    final key = _dateKey(date);
+    for (final r in rescheduledOccurrences) {
+      if (_dateKey(r.newDateTime) == key) return r;
+    }
+    return null;
+  }
+
+  /// True if the occurrence on [date] was rescheduled away to a different day.
+  bool isOccurrenceRescheduled(DateTime date) =>
+      rescheduleForOriginalDate(date) != null;
+
+  /// True if the rescheduled dose landed on [date] (and the user picked the
+  /// "replace" option, suppressing the normal occurrence for that day).
+  bool isOccurrenceReplaced(DateTime date) {
+    final r = rescheduleToDate(date);
+    return r != null && r.replacesExistingOnNewDay;
+  }
+
+  /// Returns the new fire datetime for the reschedule whose original
+  /// occurrence was on [date], or null.
+  DateTime? rescheduleTarget(DateTime date) =>
+      rescheduleForOriginalDate(date)?.newDateTime;
+
+  /// Returns the original date for a reschedule that lands on [date],
+  /// or null.
+  DateTime? rescheduleOriginal(DateTime date) =>
+      rescheduleToDate(date)?.originalDate;
+
+  /// Removes all reschedule entries tied to [date] — either as the original
+  /// occurrence or as the new fire date. Used when the user logs a dose.
+  void clearReschedulesForDate(DateTime date) {
+    rescheduledOccurrences
+        .removeWhere((r) =>
+            _dateKey(r.originalDate) == _dateKey(date) ||
+            _dateKey(r.newDateTime) == _dateKey(date));
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -132,12 +245,20 @@ class PeptideSchedule {
       'specific_date': specificDate?.millisecondsSinceEpoch,
       'end_date': endDate?.millisecondsSinceEpoch,
       'completed_occurrences': jsonEncode(completedOccurrences),
+      'rescheduled_occurrences':
+          jsonEncode(rescheduledOccurrences.map((r) => r.toMap()).toList()),
       'sync_status': syncStatus,
       'remote_id': remoteId,
     };
   }
 
   factory PeptideSchedule.fromMap(Map<String, dynamic> map) {
+    final rawReschedules = map['rescheduled_occurrences'];
+    final reschedules = (rawReschedules is String && rawReschedules.isNotEmpty)
+        ? (jsonDecode(rawReschedules) as List<dynamic>)
+            .map((e) => RescheduledOccurrence.fromMap(e as Map<String, dynamic>))
+            .toList()
+        : <RescheduledOccurrence>[];
     return PeptideSchedule(
       id: map['id'],
       peptideId: map['peptide_id'],
@@ -153,6 +274,7 @@ class PeptideSchedule {
           : DateTime.fromMillisecondsSinceEpoch(map['end_date'] as int),
       completedOccurrences: List<String>.from(
           jsonDecode(map['completed_occurrences'] ?? '[]')),
+      rescheduledOccurrences: reschedules,
       syncStatus: map['sync_status'] ?? 'pending',
       remoteId: map['remote_id'],
     );

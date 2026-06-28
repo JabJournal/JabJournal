@@ -54,6 +54,10 @@ class SQLiteService {
     if (oldVersion < 6) {
       await _migrateToV6(db);
     }
+    // v6 → v7: rescheduled_occurrences on schedules (notification reschedule action)
+    if (oldVersion < 7) {
+      await _migrateToV7(db);
+    }
     // Always make sure the latest schema exists (idempotent CREATE IF NOT EXISTS).
     await _createTables(db);
   }
@@ -117,6 +121,14 @@ class SQLiteService {
     }
   }
 
+  Future<void> _migrateToV7(Database db) async {
+    final cols = await db.rawQuery('PRAGMA table_info(peptide_schedules)');
+    if (!cols.any((c) => c['name'] == 'rescheduled_occurrences')) {
+      await db.execute(
+          'ALTER TABLE peptide_schedules ADD COLUMN rescheduled_occurrences TEXT');
+    }
+  }
+
   Future<void> _createTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS peptides (
@@ -162,6 +174,7 @@ class SQLiteService {
         specific_date INTEGER,
         end_date INTEGER,
         completed_occurrences TEXT,
+        rescheduled_occurrences TEXT,
         sync_status TEXT DEFAULT 'pending',
         remote_id TEXT,
         FOREIGN KEY (peptide_id) REFERENCES peptides (id)
