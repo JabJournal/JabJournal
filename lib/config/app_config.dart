@@ -1,7 +1,7 @@
 class AppConfig {
   // Supabase Configuration
   static const String supabaseUrl = 'YOUR_SUPABASE_URL';
-  static const String supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+  static const String supabasePublishableKey = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
 
   // Firebase Configuration
   static const String firebaseProjectId = 'YOUR_FIREBASE_PROJECT_ID';

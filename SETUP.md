@@ -25,7 +25,7 @@ To enable cloud sync, update `lib/config/app_config.dart`:
 ```dart
 class AppConfig {
   static const String supabaseUrl = 'YOUR_SUPABASE_PROJECT_URL';
-  static const String supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+  static const String supabasePublishableKey = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
   // ... rest of config
 }
 ```
