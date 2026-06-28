@@ -267,18 +267,17 @@ class BackupService {
         !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
     if (isDesktop) {
+      // file_picker 12.x: saveFile now writes the bytes itself and returns
+      // the chosen path. The extension is appended if the user didn't
+      // include one (the plugin keeps the typed filename as-is).
       final path = await FilePicker.saveFile(
         dialogTitle: 'Save Backup',
         fileName: suggestedName,
         type: FileType.any,
+        bytes: Uint8List.fromList(utf8.encode(content)),
       );
       if (path == null) return null;
-      final resolvedPath =
-          path.endsWith(_fileExtension) ? path : '$path$_fileExtension';
-      final file = File(resolvedPath);
-      await file.parent.create(recursive: true);
-      await file.writeAsString(content);
-      return file.path;
+      return path;
     }
 
     final dir = await getTemporaryDirectory();
