@@ -8,13 +8,21 @@ import '../services/notification_service.dart';
 import '../utils/peptide_colors.dart';
 
 class ScheduleProvider with ChangeNotifier {
-  final _db = DatabaseHelper();
-  final _notifications = NotificationService();
+  final DatabaseHelper _db;
+  final NotificationService _notifications;
 
   List<PeptideSchedule> _schedules = [];
   List<Peptide> _peptideList = [];
   bool _isLoading = false;
   String? _error;
+
+  /// Dependencies are injected to make the provider testable. Production
+  /// callers can omit both arguments; tests pass in mocks.
+  ScheduleProvider({
+    DatabaseHelper? databaseHelper,
+    NotificationService? notificationService,
+  })  : _db = databaseHelper ?? DatabaseHelper(),
+        _notifications = notificationService ?? NotificationService();
 
   List<PeptideSchedule> get schedules => List.unmodifiable(_schedules);
   bool get isLoading => _isLoading;
