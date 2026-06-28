@@ -2,12 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jab_journal/models/dose_history.dart';
 import 'package:jab_journal/providers/dose_history_provider.dart';
 import 'package:jab_journal/services/database/database_helper.dart';
-import 'package:jab_journal/services/supabase/sync_manager.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockDatabaseHelper extends Mock implements DatabaseHelper {}
-
-class _MockSyncManager extends Mock implements SyncManager {}
 
 void main() {
   setUpAll(() {
@@ -20,7 +17,6 @@ void main() {
   });
 
   late _MockDatabaseHelper db;
-  late _MockSyncManager sync;
   late DoseHistoryProvider provider;
 
   DoseHistory dose({
@@ -39,15 +35,10 @@ void main() {
 
   setUp(() {
     db = _MockDatabaseHelper();
-    sync = _MockSyncManager();
     when(() => db.insertDose(any())).thenAnswer((_) async => 'id');
     when(() => db.updateDose(any())).thenAnswer((_) async => 1);
     when(() => db.deleteDose(any())).thenAnswer((_) async => 1);
-    when(() => sync.syncAll()).thenAnswer((_) async {});
-    provider = DoseHistoryProvider(
-      databaseHelper: db,
-      syncManager: sync,
-    );
+    provider = DoseHistoryProvider(databaseHelper: db);
   });
 
   void expectSortedNewestFirst(List<DoseHistory> list) {

@@ -14,9 +14,13 @@ All notable changes to JabJournal will be documented here.
 - **History sections now sort chronologically** — logging or editing a dose to a past date no longer leaves the list out of order. `DoseHistoryProvider` and `WeightProvider` re-sort on every mutation, and `DoseHistoryScreen` sorts within each day group as well (#15).
 - **Notification bug** (#11).
 
+### Removed
+- **Supabase cloud sync** — the optional sync feature was untested and the user wasn't using it. Removed to clean up the dependency tree. The `sync_status` and `remote_id` columns remain in the database schema (kept as legacy fields, always set to `'pending'` / `null` now), but no longer sync anywhere. If you want to bring back cloud sync, this would need to be re-added from scratch. Deleted files: `lib/config/supabase_config.dart`, `lib/services/supabase/`, `lib/providers/sync_provider.dart`.
+
 ### Changed
-- **Supabase API upgrade** — `supabase_flutter` 2.12 → 2.15. Renamed `supabaseAnonKey` → `supabasePublishableKey` in `AppConfig` to match the new SDK terminology. The value is the same key from your Supabase project settings.
-- **Dependency upgrades** — minor/patch updates across 49 packages (connectivity_plus, intl, path_provider, sqflite, sqlite3, supabase_flutter, etc.).
+- **Dependency upgrades** — applied across 53 packages:
+  - Minor/patch: `connectivity_plus`, `intl`, `path_provider`, `sqflite`, `sqlite3`, `supabase_flutter` (now removed entirely), and 42 transitives.
+  - Major: `flutter_lints` 5→6, `permission_handler` 11→12, `flutter_local_notifications` 21→22, `flutter_foreground_task` 8→9, `share_plus` 12→13, `file_picker` 11→12 (beta).
 - **Test coverage** — 70 tests covering the schedule model, provider, notification router, and reschedule screen widget.
 
 ## [0.1.0] - 2026-05-11
@@ -32,6 +36,3 @@ Initial release.
 - Local notifications — dose reminders via system notifications with foreground service support on Android
 - Offline-first SQLite storage — all data stored locally with no account required
 - Backup & restore — export and import an encrypted backup of all data
-
-### Notes
-- Supabase sync is included but untested in this release — configure credentials at your own risk

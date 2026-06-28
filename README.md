@@ -47,7 +47,6 @@
 - **Dashboard** — summary stats and charts across all tracked data
 - **Offline-First** — all data stored locally in SQLite; works with no internet connection
 - **Automatic Data Backups** — your data is just that. Yours. Automatically backup your data and restore it from a backup if needed.
-- **Cloud Sync** — optional Supabase integration for backup and multi-device access (currently untested)
 - **Local Notifications** — timezone-aware dose reminders with a foreground service on Android
 
 ## Getting Started
@@ -83,19 +82,6 @@ flutter build apk        # Build Android APK
 flutter clean            # Clear build artifacts
 ```
 
-## Cloud Sync Setup (Optional. Currently untested.)
-
-By default the app runs fully offline. To enable Supabase sync, update `lib/config/app_config.dart`:
-
-```dart
-class AppConfig {
-  static const String supabaseUrl = 'YOUR_SUPABASE_PROJECT_URL';
-  static const String supabasePublishableKey = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
-}
-```
-
-See [SETUP.md](SETUP.md) for the full SQL schema to create the required Supabase tables.
-
 ## Architecture
 
 ```
@@ -108,14 +94,14 @@ Services (lib/services/)     — business logic and I/O
 Models (lib/models/)         — toMap/fromMap + toJson/fromJson
 ```
 
-State management uses 11 `ChangeNotifier` providers wired in `main.dart` via `MultiProvider`. The local database is SQLite (via `sqflite`), currently at schema version 3. Every row carries a `sync_status` column (`pending` | `synced` | `failed`) and a `remote_id` for Supabase sync.
+State management uses 10 `ChangeNotifier` providers wired in `main.dart` via `MultiProvider`. The local database is SQLite (via `sqflite`), currently at schema version 7. Every row still carries a `sync_status` column (`pending`) and a `remote_id` (always `null`) for legacy reasons; these are no longer used for any sync.
 
 ### Project Structure
 
 ```
 lib/
 ├── main.dart
-├── config/          # AppConfig (Supabase credentials, sync interval)
+├── config/          # AppConfig
 ├── models/          # Peptide, DoseHistory, PeptideSchedule, PeptideCalculation, WeightEntry
 ├── providers/       # Domain providers (peptides, doses, schedules, calculator, weight, …)
 ├── screens/
@@ -128,7 +114,6 @@ lib/
 │   └── settings/
 ├── services/
 │   ├── database/    # SQLiteService (singleton + migrations), DatabaseHelper (CRUD)
-│   ├── supabase/    # SupabaseService, SyncManager
 │   ├── notification_service.dart
 │   ├── foreground_service.dart
 │   └── notification_router.dart
