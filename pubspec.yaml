@@ -73,7 +73,7 @@ dependencies:
 
   # Foreground service so scheduled notifications fire reliably on devices
   # that aggressively kill backgrounded apps (e.g. Pixel)
-  flutter_foreground_task: ^8.10.0
+  flutter_foreground_task: ^9.0.0
 
 dev_dependencies:
   flutter_test:
