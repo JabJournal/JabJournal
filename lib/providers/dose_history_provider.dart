@@ -6,12 +6,20 @@ import '../services/database/database_helper.dart';
 import '../services/supabase/sync_manager.dart';
 
 class DoseHistoryProvider with ChangeNotifier {
-  final _dbHelper = DatabaseHelper();
-  final _syncManager = SyncManager();
+  final DatabaseHelper _dbHelper;
+  final SyncManager _syncManager;
 
   List<DoseHistory> _doses = [];
   bool _isLoading = false;
   String? _error;
+
+  /// Dependencies are injected to make the provider testable. Production
+  /// callers can omit both arguments; tests pass in mocks.
+  DoseHistoryProvider({
+    DatabaseHelper? databaseHelper,
+    SyncManager? syncManager,
+  })  : _dbHelper = databaseHelper ?? DatabaseHelper(),
+        _syncManager = syncManager ?? SyncManager();
 
   List<DoseHistory> get doses => _doses;
   bool get isLoading => _isLoading;
@@ -24,6 +32,7 @@ class DoseHistoryProvider with ChangeNotifier {
 
     try {
       _doses = await _dbHelper.getAllDoses();
+      _sort();
       _error = null;
     } catch (e) {
       _error = 'Error loading doses: $e';
@@ -41,6 +50,7 @@ class DoseHistoryProvider with ChangeNotifier {
 
     try {
       _doses = await _dbHelper.getDosesByPeptide(peptideId);
+      _sort();
       _error = null;
     } catch (e) {
       _error = 'Error loading doses: $e';
@@ -76,7 +86,10 @@ class DoseHistoryProvider with ChangeNotifier {
       );
 
       await _dbHelper.insertDose(dose);
-      _doses.insert(0, dose);
+      _doses.add(dose);
+      // takenAt can be a past date (user logs a dose retroactively), so we
+      // can't just prepend — sort to keep the list newest-first.
+      _sort();
       _error = null;
       notifyListeners();
 
@@ -122,6 +135,9 @@ class DoseHistoryProvider with ChangeNotifier {
 
       await _dbHelper.updateDose(updatedDose);
       _doses[index] = updatedDose;
+      // takenAt may have changed (e.g. user edited the date to a different
+      // day), so re-sort to keep the list newest-first.
+      _sort();
       _error = null;
       notifyListeners();
 
@@ -148,6 +164,16 @@ class DoseHistoryProvider with ChangeNotifier {
       debugPrint(_error);
       notifyListeners();
     }
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  /// Sorts the in-memory list newest-first by takenAt. The DB query already
+  /// returns sorted rows, but mutations (add / update with a different date)
+  /// can leave the list out of order — this keeps callers (history list,
+  /// dashboard, peptide detail) safe to assume sorted order.
+  void _sort() {
+    _doses.sort((a, b) => b.takenAt.compareTo(a.takenAt));
   }
 
   int getDoseCountForPeptide(String peptideId) {

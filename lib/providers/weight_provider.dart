@@ -7,7 +7,12 @@ import '../services/database/database_helper.dart';
 /// Manages weight log entries and exposes derived helpers (latest weight,
 /// trend vs previous entry, etc.).
 class WeightProvider with ChangeNotifier {
-  final _db = DatabaseHelper();
+  final DatabaseHelper _db;
+
+  /// Dependency is injected for testability. Production callers can omit
+  /// the argument; tests pass in a mock.
+  WeightProvider({DatabaseHelper? databaseHelper})
+      : _db = databaseHelper ?? DatabaseHelper();
 
   List<WeightEntry> _entries = [];
   bool _isLoading = false;
@@ -42,6 +47,10 @@ class WeightProvider with ChangeNotifier {
     notifyListeners();
     try {
       _entries = await _db.getAllWeights();
+      // The DB query already returns sorted rows, but sort defensively so
+      // the [entries] "newest-first" contract holds even if the DB order
+      // ever changes.
+      _sort();
     } catch (e) {
       _error = 'Error loading weights: $e';
     } finally {

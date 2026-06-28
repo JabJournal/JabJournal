@@ -347,7 +347,7 @@ class _ScheduleCard extends StatelessWidget {
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  if (isRescheduledAway)
+                  if (canLogEarly)
                     const PopupMenuItem(
                       value: 'reschedule',
                       child: ListTile(
