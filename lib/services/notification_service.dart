@@ -41,6 +41,13 @@ class NotificationService {
                 DarwinNotificationActionOption.foreground,
               },
             ),
+            DarwinNotificationAction.plain(
+              NotificationRouter.rescheduleDoseActionId,
+              'Re-schedule',
+              options: {
+                DarwinNotificationActionOption.foreground,
+              },
+            ),
           ],
         ),
       ],
@@ -291,6 +298,12 @@ class NotificationService {
                   AndroidNotificationAction(
                     NotificationRouter.logDoseActionId,
                     'Log Dose',
+                    showsUserInterface: true,
+                    cancelNotification: true,
+                  ),
+                  AndroidNotificationAction(
+                    NotificationRouter.rescheduleDoseActionId,
+                    'Re-schedule',
                     showsUserInterface: true,
                     cancelNotification: true,
                   ),

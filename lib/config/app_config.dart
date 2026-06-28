@@ -8,7 +8,7 @@ class AppConfig {
 
   // Database Configuration
   static const String databaseName = 'jab_journal.db';
-  static const int databaseVersion = 6;
+  static const int databaseVersion = 7;
 
   // App Configuration
   static const String appName = 'JabJournal';
