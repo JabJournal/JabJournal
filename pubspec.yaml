@@ -69,7 +69,7 @@ dependencies:
   crypto: ^3.0.3
 
   # Permissions (notifications, exact alarms, battery optimization)
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.0
 
   # Foreground service so scheduled notifications fire reliably on devices
   # that aggressively kill backgrounded apps (e.g. Pixel)
