@@ -37,6 +37,11 @@ class _DoseHistoryScreenState extends State<DoseHistoryScreen> {
       final key = DateTime(dose.takenAt.year, dose.takenAt.month, dose.takenAt.day);
       (result[key] ??= []).add(dose);
     }
+    // Sort within each day too — the provider list is newest-first overall,
+    // but explicit sort here makes the screen safe regardless of input order.
+    for (final list in result.values) {
+      list.sort((a, b) => b.takenAt.compareTo(a.takenAt));
+    }
     return result;
   }
 
