@@ -42,20 +42,18 @@ Models (lib/models/) — toMap/fromMap + toJson/fromJson on every model
 
 ### State Management
 
-11 `ChangeNotifier` providers wired in `main.dart` via `MultiProvider`. Each provider owns one domain (peptides, dose history, schedules, calculator, weight, sync, notifications, theme, backup). Providers call services directly; there is no intermediate repository abstraction above the service layer.
+10 `ChangeNotifier` providers wired in `main.dart` via `MultiProvider`. Each provider owns one domain (peptides, dose history, schedules, calculator, weight, notifications, theme, backup, foreground service, notification status). Providers call services directly; there is no intermediate repository abstraction above the service layer.
 
 ### Data Layer
 
 - **SQLiteService** (`lib/services/database/sqlite_service.dart`) — singleton holding the database instance, schema creation, and migrations.
 - **DatabaseHelper** (`lib/services/database/database_helper.dart`) — all CRUD methods, called by providers.
-- Database is at version 3; migrations live in `SQLiteService._migrateToV2` / `_migrateToV3`.
-- Every row has a `sync_status` column (`'pending'` | `'synced'` | `'failed'`) and `remote_id` for Supabase sync.
+- Database is at version 7; migrations live in `SQLiteService._migrateToV2` through `_migrateToV7`.
+- Every row has a `sync_status` column (always `'pending'`) and `remote_id` (always `null`) for legacy reasons — Supabase cloud sync was removed in 0.2.0. These columns can be ignored for new development.
 
-### Sync
+### Cloud Sync
 
-- **SyncManager** (`lib/services/supabase/sync_manager.dart`) — monitors connectivity (connectivity_plus) and flushes pending rows to Supabase on reconnect. Sync interval is 300 s (configurable in `lib/config/app_config.dart`).
-- **SupabaseService** (`lib/services/supabase/supabase_service.dart`) — thin wrapper around the Supabase REST client.
-- Supabase credentials are placeholders in `app_config.dart`; the app works fully offline without them.
+Removed in 0.2.0. The previous `SyncManager` and `SupabaseService` were untested and not in use. If cloud sync is needed again, it would need to be re-added from scratch against a new backend.
 
 ### Notifications
 

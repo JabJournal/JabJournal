@@ -87,7 +87,7 @@ class _NoopTaskHandler extends TaskHandler {
   void onRepeatEvent(DateTime timestamp) {}
 
   @override
-  Future<void> onDestroy(DateTime timestamp) async {
-    debugPrint('[PeptideForegroundService] Destroyed at $timestamp');
+  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
+    debugPrint('[PeptideForegroundService] Destroyed at $timestamp (timeout=$isTimeout)');
   }
 }

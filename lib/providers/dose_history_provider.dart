@@ -3,23 +3,18 @@ import 'package:uuid/uuid.dart';
 import '../models/dose_history.dart';
 import '../services/backup_scheduler.dart';
 import '../services/database/database_helper.dart';
-import '../services/supabase/sync_manager.dart';
 
 class DoseHistoryProvider with ChangeNotifier {
   final DatabaseHelper _dbHelper;
-  final SyncManager _syncManager;
 
   List<DoseHistory> _doses = [];
   bool _isLoading = false;
   String? _error;
 
-  /// Dependencies are injected to make the provider testable. Production
-  /// callers can omit both arguments; tests pass in mocks.
-  DoseHistoryProvider({
-    DatabaseHelper? databaseHelper,
-    SyncManager? syncManager,
-  })  : _dbHelper = databaseHelper ?? DatabaseHelper(),
-        _syncManager = syncManager ?? SyncManager();
+  /// DatabaseHelper is injected to make the provider testable. Production
+  /// callers can omit the argument; tests pass in a mock.
+  DoseHistoryProvider({DatabaseHelper? databaseHelper})
+      : _dbHelper = databaseHelper ?? DatabaseHelper();
 
   List<DoseHistory> get doses => _doses;
   bool get isLoading => _isLoading;
@@ -93,7 +88,6 @@ class DoseHistoryProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _syncManager.syncAll();
       BackupScheduler.instance.scheduleBackup();
       return dose.id;
     } catch (e) {
@@ -141,7 +135,6 @@ class DoseHistoryProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _syncManager.syncAll();
       BackupScheduler.instance.scheduleBackup();
     } catch (e) {
       _error = 'Error updating dose: $e';
@@ -157,7 +150,6 @@ class DoseHistoryProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _syncManager.syncAll();
       BackupScheduler.instance.scheduleBackup();
     } catch (e) {
       _error = 'Error deleting dose: $e';

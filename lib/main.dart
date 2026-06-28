@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'config/supabase_config.dart';
 import 'providers/peptide_provider.dart';
 import 'providers/dose_history_provider.dart';
 import 'providers/calculator_provider.dart';
-import 'providers/sync_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/schedule_provider.dart';
@@ -39,12 +37,6 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
 
-  try {
-    await SupabaseConfig.initialize();
-  } catch (e) {
-    debugPrint('Supabase initialization error (may be expected in development): $e');
-  }
-
   runApp(PeptideTrackerApp(
     themeProvider: themeProvider,
     backupProvider: backupProvider,
@@ -72,11 +64,6 @@ class PeptideTrackerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PeptideProvider()),
         ChangeNotifierProvider(create: (_) => DoseHistoryProvider()),
         ChangeNotifierProvider(create: (_) => CalculatorProvider()),
-        ChangeNotifierProvider(create: (_) {
-          final syncProvider = SyncProvider();
-          syncProvider.initialize();
-          return syncProvider;
-        }),
         ChangeNotifierProvider(create: (_) {
           final notificationProvider = NotificationProvider();
           notificationProvider.initialize();

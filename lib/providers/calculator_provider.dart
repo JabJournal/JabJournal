@@ -3,11 +3,9 @@ import 'package:uuid/uuid.dart';
 import '../models/peptide_calculation.dart';
 import '../services/backup_scheduler.dart';
 import '../services/database/database_helper.dart';
-import '../services/supabase/sync_manager.dart';
 
 class CalculatorProvider with ChangeNotifier {
   final _dbHelper = DatabaseHelper();
-  final _syncManager = SyncManager();
 
   List<PeptideCalculation> _calculations = [];
   bool _isLoading = false;
@@ -75,7 +73,6 @@ class CalculatorProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _syncManager.syncAll();
       BackupScheduler.instance.scheduleBackup();
     } catch (e) {
       _error = 'Error saving calculation: $e';
@@ -91,7 +88,6 @@ class CalculatorProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _syncManager.syncAll();
       BackupScheduler.instance.scheduleBackup();
     } catch (e) {
       _error = 'Error deleting calculation: $e';

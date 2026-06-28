@@ -3,11 +3,9 @@ import 'package:uuid/uuid.dart';
 import '../models/peptide.dart';
 import '../services/backup_scheduler.dart';
 import '../services/database/database_helper.dart';
-import '../services/supabase/sync_manager.dart';
 
 class PeptideProvider with ChangeNotifier {
   final _dbHelper = DatabaseHelper();
-  final _syncManager = SyncManager();
 
   List<Peptide> _peptides = [];
   bool _isLoading = false;
@@ -61,7 +59,6 @@ class PeptideProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _syncManager.syncAll();
       BackupScheduler.instance.scheduleBackup();
     } catch (e) {
       _error = 'Error adding peptide: $e';
@@ -103,7 +100,6 @@ class PeptideProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _syncManager.syncAll();
       BackupScheduler.instance.scheduleBackup();
     } catch (e) {
       _error = 'Error updating peptide: $e';
@@ -119,7 +115,6 @@ class PeptideProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      _syncManager.syncAll();
       BackupScheduler.instance.scheduleBackup();
     } catch (e) {
       _error = 'Error deleting peptide: $e';

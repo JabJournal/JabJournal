@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.3+4
+version: 0.2.0+5
 
 environment:
   sdk: ^3.8.1
@@ -40,16 +40,14 @@ dependencies:
   sqflite: ^2.4.2
   sqlite3: ^3.1.0
 
-  # Supabase & Sync
-  supabase_flutter: ^2.12.4
-  connectivity_plus: ^7.1.1
+  # Sync (Supabase removed in 0.2.0 — see CHANGELOG)
 
   # UI & Charts
   fl_chart: ^1.2.0
   intl: ^0.20.2
 
   # Notifications
-  flutter_local_notifications: ^21.0.0
+  flutter_local_notifications: ^22.0.0
 
   # Timezone support for local notifications
   flutter_timezone: ^5.0.2
@@ -63,17 +61,17 @@ dependencies:
 
   # Backup & Export
   path_provider: ^2.1.4
-  share_plus: ^12.0.2
-  file_picker: ^11.0.2
+  share_plus: ^13.0.0
+  file_picker: ^12.0.0-beta.7
   encrypt: ^5.0.3
   crypto: ^3.0.3
 
   # Permissions (notifications, exact alarms, battery optimization)
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.0
 
   # Foreground service so scheduled notifications fire reliably on devices
   # that aggressively kill backgrounded apps (e.g. Pixel)
-  flutter_foreground_task: ^8.10.0
+  flutter_foreground_task: ^9.0.0
 
 dev_dependencies:
   flutter_test:
@@ -84,7 +82,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
   # Mock library for the schedule provider tests. No code-gen step required.
   mocktail: ^1.0.4
