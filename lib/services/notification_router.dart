@@ -23,6 +23,16 @@ class NotificationRouter {
   /// Action ID for the "Re-schedule" button on schedule reminder notifications.
   static const rescheduleDoseActionId = 'reschedule_dose';
 
+  /// Resets the static in-flight state used by [handleResponse] and the
+  /// dedup flags. Intended for tests — the production app treats the router
+  /// as a long-lived singleton.
+  @visibleForTesting
+  static void resetForTesting() {
+    _pending = null;
+    _logDoseOpen = false;
+    _rescheduleOpen = false;
+  }
+
   /// Builds the JSON payload encoded into a scheduled-reminder notification.
   /// We embed the peptide name + ID so the tap handler can navigate directly
   /// without having to reach into a Provider.
